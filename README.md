@@ -36,7 +36,8 @@ Download the DMG from [spektralab.app](https://spektralab.app) or
 drag SpektraLab to Applications. It is signed with a Developer ID and
 notarised by Apple, so it opens like any other app.
 
-Apple silicon, macOS 15 or later.
+Apple silicon, macOS 15 or later. On Intel, build the `intel-x86_64` branch of
+this fork: see [Build](#build).
 
 Releases before 1.3.3 are ad-hoc signed. For one of those, clear the
 quarantine once:
@@ -87,7 +88,11 @@ that folder. A file dropped from Finder still opens and edits.
 
 ## Build
 
-Xcode 26.6.
+Xcode 26.6 (26.5 also builds this branch).
+
+This branch builds for Intel: `ARCHS` in `Tools/gen-project.py` is `x86_64`, and
+`"arm64 x86_64"` gives a universal app. It needs a Metal GPU in the `Mac2`
+family, and it is tested on an AMD Radeon RX 6800.
 
 ```bash
 engine/build.sh bundle                 # engine, kernels, baked resources

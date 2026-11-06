@@ -53,7 +53,9 @@ Film Edge 和 Date Back 不参与同步；拍摄时白平衡和场景放置拟�
 
 ## 构建
 
-Xcode 26.6。
+Xcode 26.6（本分支用 26.5 也能构建）。
+
+本分支面向 Intel：`Tools/gen-project.py` 中的 `ARCHS` 为 `x86_64`，改成 `"arm64 x86_64"` 即可构建通用版本。需要 `Mac2` 系列的 Metal GPU，已在 AMD Radeon RX 6800 上测试。
 
 ```bash
 engine/build.sh bundle                 # 引擎、着色器、预烘焙资源

@@ -60,7 +60,10 @@ Trap **numbers are cited across the code** (`engine/`, `desktop/`, tests,
 
 ## Build and test
 
-Xcode 26.6, macOS 15+, Apple silicon (`ARCHS = arm64`).
+Xcode 26.6 (26.5 builds this branch), macOS 15+. `ARCHS` is one constant in
+`Tools/gen-project.py`: `x86_64` on the `intel-x86_64` branch, and
+`Tools/package.sh` reads it for the DMG's name and the slice check. See traps 36
+to 38 for what an Intel GPU changes.
 
 ```bash
 engine/build.sh bundle          # engine + MSL kernels + baked resources into the app
@@ -285,6 +288,29 @@ do not run here; the C++ port still carries each lesson, and code cites them.
     with a fingerprint for moved files; `<image>.spektra.json` is the old home,
     migrated on first read. **A develop writes a sidecar**, so a test copies its
     fixture before opening it.
+36. **A texture the CPU touches is not `.shared` on an Intel Mac.** Metal refuses
+    it under the validation layer (`MTLStorageModeShared not allowed for textures`)
+    and, worse, accepts it without one. Ask `device.cpuVisibleTextureStorage`
+    (`Canvas/GPUStorage.swift`): `.shared` on an Apple GPU, `.managed` otherwise.
+    A `.managed` texture's `getBytes` reads the CPU's copy, so **after a GPU write
+    it silently returns what was there before** until `synchronizeForCPU()` runs:
+    11 tests read all zeros that way. Sync at the door of a read, never in the draw
+    loop. A texture over an `MTLBuffer` stays `.shared` everywhere. Run the suite
+    once with `TEST_RUNNER_MTL_DEBUG_LAYER=1` after touching any of this.
+37. **`spk_math_probe` reads all zeros under safe math on an AMD GPU.** Nothing
+    there contracts `a*b - a*b` into an fma, so zero says nothing about how the
+    library was compiled. `spk_math_probe_eft` asks the question directly (TwoSum's
+    error term and an explicit `fma`, held to the host's IEEE answer), and only
+    runs when the first probe read zeros. `check_math_guard.sh` is the proof the
+    guard still fires there. Swift's `Float16` does not exist on x86_64 either;
+    `CineonLUT.halfFloatBits` is the vImage form.
+38. **On a discrete GPU a frame-sized `alloc` has no `contents()`.** It lives in
+    the GPU's memory (`kDeviceLocalFloor`, `metal_gpu.cpp`), because a chain of
+    full-frame kernels over shared buffers is mostly PCIe traffic: 24 MP on an
+    RX 6800 was 3.1 s against 0.6 s, with bit-identical output. Reach it through
+    `read` and `copy`. `upload*`, `alloc_persistent`, `alloc_file_backed` and
+    anything under 1 MB stay host-visible. `SPEKTRAFILM_SHARED_POOL=1` turns it
+    off for interleaved measurement (trap 17).
 
 ---
 

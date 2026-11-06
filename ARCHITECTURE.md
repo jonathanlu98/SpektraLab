@@ -14,7 +14,7 @@ they stay put; new material goes in new subsections.
 ## 0. The product, end to end
 
 ```
-  ┌─ SpektraLab.app ── one arm64 binary, 32 MB, macOS 15+ ────────────────┐
+  ┌─ SpektraLab.app ── one binary, `ARCHS` in gen-project, macOS 15+ ─────┐
   │  SwiftUI + AppKit + Metal · English / 简体中文                         │
   │                                                                       │
   │  Import/      RAW + TIFF decode (Core Image) → linear ProPhoto float  │
@@ -222,7 +222,7 @@ Tools/package.sh           archive → export → verify → floor → DMG → n
 - **`engine/resources/` is tracked** (15 MB of baked output). Regenerating it
   needs the Python reference upstream. The metallib is the one untracked file.
 - **The floor is checked on the artefact**: `LSMinimumSystemVersion` 15.0,
-  every Mach-O arm64 with `minos` ≤ 15, every metallib ≤ 15.
+  every Mach-O with every slice in `ARCHS` and `minos` ≤ 15, every metallib ≤ 15.
 - **Versions** live once, in `Tools/gen-project.py` (`MARKETING_VERSION`,
   `BUILD_NUMBER`).
 - **Signing.** Hardened runtime, empty entitlements, ad-hoc signed. Releases
