@@ -153,6 +153,33 @@ kernel void spk_math_probe(device const float* in [[buffer(0)]],
     out[i] = a * b - a * b;
 }
 
+// The same question for a GPU whose compiler never contracts.
+//
+// The probe above reads zero under safe math too on an AMD GPU (RX 6800, Xcode
+// 26.5): nothing there fuses `a * b - a * b`, so "exactly zero" says nothing
+// about how the library was compiled. So this asks what the double-float
+// arithmetic in `spk_common.h` actually depends on, directly:
+//
+//   out[2i]     TwoSum's error term. Reassociated under fast math to exactly 0,
+//               and the exact round-off of `a + b` otherwise.
+//   out[2i+1]   an explicit `fma(a, b, -(a*b))`, which `two_prod` needs to be
+//               a real fused operation. Exact, or the double-float kernels lose
+//               the precision they exist for.
+//
+// `check_math_mode` holds both to the host's IEEE answer. It only runs when
+// `spk_math_probe` read all zeros, so a GPU that contracts never gets here.
+kernel void spk_math_probe_eft(device const float* in [[buffer(0)]],
+                               device float* out [[buffer(1)]],
+                               uint3 thread_position_in_grid [[thread_position_in_grid]]) {
+    uint i = thread_position_in_grid.x;
+    float a = in[2u * i], b = in[2u * i + 1u];
+    float s = a + b;
+    float bb = s - a;
+    out[2u * i] = (a - (s - bb)) + (b - bb);
+    float p = a * b;
+    out[2u * i + 1u] = fma(a, b, -p);
+}
+
 // A strided sample of the frame, gathered on device.
 //
 // The auto-exposure meter needs a ~256 px view of the frame and nothing more

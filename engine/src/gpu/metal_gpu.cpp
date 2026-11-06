@@ -196,13 +196,25 @@ public:
             if (got[i] == 0.0f) ++zeros;
             else if (got[i] != want) ++mismatched;
         }
+        // All zeros is what fast math looks like, and also what safe math looks
+        // like on a GPU that does not contract, so it is not yet a verdict.
+        // Ask the question that does not depend on contraction: a library
+        // compiled with fast math fails this one too, on any GPU.
+        std::string eft_detail;
+        const bool eft_ok = zeros == n && check_error_free_transforms(in, n, eft_detail);
         end_frame();
+        if (eft_ok) {
+            detail = "safe (probe: this GPU does not contract; TwoSum and fma are exact)";
+            return true;
+        }
         if (zeros == n) {
-            detail = "the Metal library was compiled with fast math: `a*b - a*b` came back "
-                     "exactly zero for all 64 probes. Rebuild with "
-                     "-fmetal-math-mode=safe -fmetal-math-fp32-functions=precise "
-                     "(RFC-014 §5.1 trap 1: fast math drifts exp and fma contraction by up to "
-                     "1.1e-5, which is past the float32 bar and silent).";
+            detail = eft_detail.empty()
+                ? "the Metal library was compiled with fast math: `a*b - a*b` came back "
+                  "exactly zero for all 64 probes, and so did TwoSum's error term. Rebuild with "
+                  "-fmetal-math-mode=safe -fmetal-math-fp32-functions=precise "
+                  "(RFC-014 §5.1 trap 1: fast math drifts exp and fma contraction by up to "
+                  "1.1e-5, which is past the float32 bar and silent)."
+                : eft_detail;
             return false;
         }
         if (mismatched > 0) {
@@ -797,6 +809,46 @@ public:
     }
 
 private:
+    // `spk_math_probe_eft`, held to the host's IEEE answer. Leaves `detail`
+    // empty when the verdict is plain fast math, so the caller keeps one
+    // message for the one failure this guard exists to name.
+    //
+    // `s`, `bb` and `p` are `volatile` so this translation unit cannot be the
+    // thing that reassociates or fuses them: the host side has to be strict
+    // IEEE whatever flags it was built with.
+    bool check_error_free_transforms(const float* in, size_t n, std::string& detail) {
+        std::string error;
+        BufferRef src = upload(in, 2 * n * sizeof(float), error);
+        BufferRef dst = alloc(2 * n * sizeof(float), error);
+        if (!src || !dst) { detail = "math probe could not allocate: " + error; return false; }
+        if (!dispatch("spk_math_probe_eft", {Arg::buf(src), Arg::buf(dst)}, n, error) || !flush(error)) {
+            detail = "math probe failed to run: " + error;
+            return false;
+        }
+        const float* got = static_cast<const float*>(contents(dst.get()));
+        size_t sum_zeros = 0, sum_wrong = 0, fma_wrong = 0;
+        for (size_t i = 0; i < n; ++i) {
+            const float a = in[2 * i], b = in[2 * i + 1];
+            volatile float s = a + b;
+            volatile float bb = s - a;
+            const float sum_err = (a - (s - bb)) + (b - bb);
+            volatile float p = a * b;
+            const float fma_err = std::fma(a, b, -p);
+            if (got[2 * i] == 0.0f && sum_err != 0.0f) ++sum_zeros;
+            else if (got[2 * i] != sum_err) ++sum_wrong;
+            if (got[2 * i + 1] != fma_err) ++fma_wrong;
+        }
+        if (sum_zeros > 0 && sum_wrong == 0) return false;   // fast math: the caller's message
+        if (sum_wrong > 0 || fma_wrong > 0) {
+            detail = "this GPU's TwoSum or fma disagrees with the host's IEEE answer (" +
+                     std::to_string(sum_wrong) + " and " + std::to_string(fma_wrong) +
+                     " of " + std::to_string(n) + "): the double-float kernels in "
+                     "spk_common.h would not hold their precision here.";
+            return false;
+        }
+        return true;
+    }
+
     // --- RFC-020 §3.1, the idle form: nobody is editing any more ----------
 
     // The other half of "not at `end_frame`". The pool is kept between renders
