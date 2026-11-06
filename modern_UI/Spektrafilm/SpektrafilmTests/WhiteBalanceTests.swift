@@ -332,7 +332,7 @@ final class WhiteBalanceTests: XCTestCase {
         let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: texture.pixelFormat,
                                                          width: texture.width, height: texture.height,
                                                          mipmapped: false)
-        d.storageMode = .shared
+        d.storageMode = session.renderer.device.cpuVisibleTextureStorage
         let copy = try XCTUnwrap(session.renderer.device.makeTexture(descriptor: d))
         let queue = try XCTUnwrap(session.renderer.device.makeCommandQueue())
         let cb = try XCTUnwrap(queue.makeCommandBuffer())
@@ -341,6 +341,7 @@ final class WhiteBalanceTests: XCTestCase {
         blit.endEncoding()
         cb.commit()
         cb.waitUntilCompleted()
+        copy.synchronizeForCPU()
         var bytes = [UInt16](repeating: 0, count: texture.width * texture.height * 4)
         bytes.withUnsafeMutableBytes {
             copy.getBytes($0.baseAddress!, bytesPerRow: texture.width * 8,

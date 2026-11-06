@@ -397,7 +397,7 @@ final class TextureStore: @unchecked Sendable {
         guard width > 0, height > 0, data.count == width * height * 8 else { return nil }
         let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Unorm, width: width, height: height, mipmapped: false)
         d.usage = [.shaderRead]
-        d.storageMode = .shared
+        d.storageMode = device.cpuVisibleTextureStorage
         guard let tex = device.makeTexture(descriptor: d) else { return nil }
         data.withUnsafeBytes { raw in
             tex.replace(region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0,
@@ -409,7 +409,7 @@ final class TextureStore: @unchecked Sendable {
     func makeWritable(width: Int, height: Int, format: MTLPixelFormat = .rgba16Unorm) -> MTLTexture? {
         let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: width, height: height, mipmapped: false)
         d.usage = [.shaderRead, .shaderWrite, .renderTarget]
-        d.storageMode = .shared
+        d.storageMode = device.cpuVisibleTextureStorage
         return device.makeTexture(descriptor: d)
     }
 
@@ -417,7 +417,7 @@ final class TextureStore: @unchecked Sendable {
     func makeCurveTable() -> MTLTexture? {
         let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r32Float, width: Curve.tableSize, height: 5, mipmapped: false)
         d.usage = [.shaderRead]
-        d.storageMode = .shared
+        d.storageMode = device.cpuVisibleTextureStorage
         return device.makeTexture(descriptor: d)
     }
 

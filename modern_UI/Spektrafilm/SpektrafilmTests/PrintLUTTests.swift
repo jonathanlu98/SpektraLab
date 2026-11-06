@@ -458,6 +458,7 @@ final class PrintLUTTests: XCTestCase {
     }
 
     private func mean(_ texture: MTLTexture) throws -> Double {
+        texture.synchronizeForCPU()
         let bpr = texture.width * 8
         var data = Data(count: bpr * texture.height)
         data.withUnsafeMutableBytes { raw in

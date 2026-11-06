@@ -656,8 +656,14 @@ final class Renderer: NSObject {
         d.pixelFormat = .r8Unorm
         d.width = 1; d.height = 1; d.arrayLength = 1
         d.usage = [.shaderRead]
-        d.storageMode = .shared
-        return device.makeTexture(descriptor: d)
+        d.storageMode = device.cpuVisibleTextureStorage
+        guard let t = device.makeTexture(descriptor: d) else { return nil }
+        // Written, not assumed: nothing promises a `.managed` allocation's
+        // contents the way an untouched shared page happens to read as zero.
+        var zero: UInt8 = 0
+        t.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, slice: 0,
+                  withBytes: &zero, bytesPerRow: 1, bytesPerImage: 1)
+        return t
     }()
 
     private func encodeLayer2(_ cb: MTLCommandBuffer, src: MTLTexture, dst: MTLTexture) {
@@ -1222,6 +1228,7 @@ extension MTLTexture {
     /// densities rather than colours; see `Exporter`).
     func makeCGImage(space: CGColorSpace = ImageDecoder.workingSpace ?? ImageDecoder.displayP3) -> CGImage? {
         guard pixelFormat == .rgba16Unorm else { return nil }
+        synchronizeForCPU()
         let bpr = width * 8
         var data = Data(count: bpr * height)
         data.withUnsafeMutableBytes { raw in
@@ -1236,6 +1243,7 @@ extension MTLTexture {
 
     /// Raw 16-bit RGBA bytes, top row first.
     func rgba16Bytes() -> Data {
+        synchronizeForCPU()
         let bpr = width * 8
         var data = Data(count: bpr * height)
         data.withUnsafeMutableBytes { raw in

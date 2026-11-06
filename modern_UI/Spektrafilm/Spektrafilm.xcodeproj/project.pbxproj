@@ -32,6 +32,7 @@
 		3CC9377A61A47BF9746521A9 /* ColourManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ColourManagement.swift"; sourceTree = "<group>"; };
 		AE9DF7CC994C0A44902731CA /* CompareOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CompareOverlay.swift"; sourceTree = "<group>"; };
 		DA37ABB15B5AE3CB099586C8 /* CropOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CropOverlay.swift"; sourceTree = "<group>"; };
+		0B4594CE7CE6A6A7553BD6F5 /* GPUStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GPUStorage.swift"; sourceTree = "<group>"; };
 		46075402D0B9D2BA48F0BE15 /* MaskOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MaskOverlay.swift"; sourceTree = "<group>"; };
 		D520629C88EB987F0C407670 /* MetalCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MetalCanvasView.swift"; sourceTree = "<group>"; };
 		B97DAB336698EA10C283D351 /* PairOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PairOverlay.swift"; sourceTree = "<group>"; };
@@ -47,6 +48,7 @@
 				3CC9377A61A47BF9746521A9 /* ColourManagement.swift */,
 				AE9DF7CC994C0A44902731CA /* CompareOverlay.swift */,
 				DA37ABB15B5AE3CB099586C8 /* CropOverlay.swift */,
+				0B4594CE7CE6A6A7553BD6F5 /* GPUStorage.swift */,
 				46075402D0B9D2BA48F0BE15 /* MaskOverlay.swift */,
 				D520629C88EB987F0C407670 /* MetalCanvasView.swift */,
 				B97DAB336698EA10C283D351 /* PairOverlay.swift */,
@@ -389,6 +391,7 @@
 		6EECE9753FC82445EF92F8E0 /* GamutVolumeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GamutVolumeTests.swift"; sourceTree = "<group>"; };
 		969C5D33E53586D8DBA10B9F /* GeometryContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GeometryContractTests.swift"; sourceTree = "<group>"; };
 		A80314DB52E95A2058ED6D6E /* GeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GeometryTests.swift"; sourceTree = "<group>"; };
+		1F342F5A28A14815D5A9A582 /* GPUStorageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GPUStorageTests.swift"; sourceTree = "<group>"; };
 		250924B2CD408CCB39ED0A18 /* HalfFramePairTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HalfFramePairTests.swift"; sourceTree = "<group>"; };
 		D21FA14465ADF0C32032374E /* LayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LayoutTests.swift"; sourceTree = "<group>"; };
 		CE8421F06D7963E4B9992184 /* LicensingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LicensingTests.swift"; sourceTree = "<group>"; };
@@ -459,6 +462,7 @@
 				6EECE9753FC82445EF92F8E0 /* GamutVolumeTests.swift */,
 				969C5D33E53586D8DBA10B9F /* GeometryContractTests.swift */,
 				A80314DB52E95A2058ED6D6E /* GeometryTests.swift */,
+				1F342F5A28A14815D5A9A582 /* GPUStorageTests.swift */,
 				250924B2CD408CCB39ED0A18 /* HalfFramePairTests.swift */,
 				D21FA14465ADF0C32032374E /* LayoutTests.swift */,
 				CE8421F06D7963E4B9992184 /* LicensingTests.swift */,
@@ -615,6 +619,7 @@
 		F443D4211A905991F59FAF70 /* ColourManagement.swift */ = {isa = PBXBuildFile; fileRef = 3CC9377A61A47BF9746521A9; };
 		CDAFF5BAC779CA0E91DCC89D /* CompareOverlay.swift */ = {isa = PBXBuildFile; fileRef = AE9DF7CC994C0A44902731CA; };
 		A9FFB83C7123E9F7C95F636A /* CropOverlay.swift */ = {isa = PBXBuildFile; fileRef = DA37ABB15B5AE3CB099586C8; };
+		02EA2AB3D490244219918FF3 /* GPUStorage.swift */ = {isa = PBXBuildFile; fileRef = 0B4594CE7CE6A6A7553BD6F5; };
 		8431707FE1E29D1A6768003F /* MaskOverlay.swift */ = {isa = PBXBuildFile; fileRef = 46075402D0B9D2BA48F0BE15; };
 		B1E5C09D7DE57FD941B4795F /* MetalCanvasView.swift */ = {isa = PBXBuildFile; fileRef = D520629C88EB987F0C407670; };
 		B810150D6A8E5C5342C091A0 /* PairOverlay.swift */ = {isa = PBXBuildFile; fileRef = B97DAB336698EA10C283D351; };
@@ -751,6 +756,7 @@
 				F443D4211A905991F59FAF70 /* ColourManagement.swift */,
 				CDAFF5BAC779CA0E91DCC89D /* CompareOverlay.swift */,
 				A9FFB83C7123E9F7C95F636A /* CropOverlay.swift */,
+				02EA2AB3D490244219918FF3 /* GPUStorage.swift */,
 				8431707FE1E29D1A6768003F /* MaskOverlay.swift */,
 				B1E5C09D7DE57FD941B4795F /* MetalCanvasView.swift */,
 				B810150D6A8E5C5342C091A0 /* PairOverlay.swift */,
@@ -930,6 +936,7 @@
 		B4EC4B7CFDE6BB3DB5094608 /* GamutVolumeTests.swift */ = {isa = PBXBuildFile; fileRef = 6EECE9753FC82445EF92F8E0; };
 		BCA5341CF538605C6424EF81 /* GeometryContractTests.swift */ = {isa = PBXBuildFile; fileRef = 969C5D33E53586D8DBA10B9F; };
 		2209A1D226457302F50FFEE6 /* GeometryTests.swift */ = {isa = PBXBuildFile; fileRef = A80314DB52E95A2058ED6D6E; };
+		4D588583A2FCD0069CDF91FF /* GPUStorageTests.swift */ = {isa = PBXBuildFile; fileRef = 1F342F5A28A14815D5A9A582; };
 		CDF7D03174AE7319814EB8D7 /* HalfFramePairTests.swift */ = {isa = PBXBuildFile; fileRef = 250924B2CD408CCB39ED0A18; };
 		79A4427684DDABB45B19288D /* LayoutTests.swift */ = {isa = PBXBuildFile; fileRef = D21FA14465ADF0C32032374E; };
 		302F9DB7C81BCB801B293621 /* LicensingTests.swift */ = {isa = PBXBuildFile; fileRef = CE8421F06D7963E4B9992184; };
@@ -974,6 +981,7 @@
 		8CDECFAE3D708A987D5F23D1 /* ColourManagement.swift */ = {isa = PBXBuildFile; fileRef = 3CC9377A61A47BF9746521A9; };
 		047A7D7877482487B6E36B80 /* CompareOverlay.swift */ = {isa = PBXBuildFile; fileRef = AE9DF7CC994C0A44902731CA; };
 		22C990CC86531976E3AEE1E6 /* CropOverlay.swift */ = {isa = PBXBuildFile; fileRef = DA37ABB15B5AE3CB099586C8; };
+		ED23B2B7645EE69F4F1F4D21 /* GPUStorage.swift */ = {isa = PBXBuildFile; fileRef = 0B4594CE7CE6A6A7553BD6F5; };
 		CC2AE2258FA6A084866E6BE2 /* MaskOverlay.swift */ = {isa = PBXBuildFile; fileRef = 46075402D0B9D2BA48F0BE15; };
 		B244C1A7096587CAC12C533A /* MetalCanvasView.swift */ = {isa = PBXBuildFile; fileRef = D520629C88EB987F0C407670; };
 		790933AC1A438E605AF31E7E /* PairOverlay.swift */ = {isa = PBXBuildFile; fileRef = B97DAB336698EA10C283D351; };
@@ -1132,6 +1140,7 @@
 				B4EC4B7CFDE6BB3DB5094608 /* GamutVolumeTests.swift */,
 				BCA5341CF538605C6424EF81 /* GeometryContractTests.swift */,
 				2209A1D226457302F50FFEE6 /* GeometryTests.swift */,
+				4D588583A2FCD0069CDF91FF /* GPUStorageTests.swift */,
 				CDF7D03174AE7319814EB8D7 /* HalfFramePairTests.swift */,
 				79A4427684DDABB45B19288D /* LayoutTests.swift */,
 				302F9DB7C81BCB801B293621 /* LicensingTests.swift */,
@@ -1176,6 +1185,7 @@
 				8CDECFAE3D708A987D5F23D1 /* ColourManagement.swift */,
 				047A7D7877482487B6E36B80 /* CompareOverlay.swift */,
 				22C990CC86531976E3AEE1E6 /* CropOverlay.swift */,
+				ED23B2B7645EE69F4F1F4D21 /* GPUStorage.swift */,
 				CC2AE2258FA6A084866E6BE2 /* MaskOverlay.swift */,
 				B244C1A7096587CAC12C533A /* MetalCanvasView.swift */,
 				790933AC1A438E605AF31E7E /* PairOverlay.swift */,

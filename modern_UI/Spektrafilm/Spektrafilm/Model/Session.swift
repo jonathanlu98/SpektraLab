@@ -2134,14 +2134,14 @@ final class Session: CanvasHost {
                     guard let image = lease.take() else { throw CancellationError() }
                     return TextureBox(try ImageDecoder.makePreviewTexture(
                         image, device: device, maxEdge: edge,
-                        storageMode: .shared, checkpoint: checkpoint))
+                        storageMode: device.cpuVisibleTextureStorage, checkpoint: checkpoint))
                 }
             } onCancel: {
                 lease.release()
             }) ?? TextureBox(nil)
         } else {
             preview = TextureBox(ImageDecoder.makePreviewTexture(
-                d, device: device, maxEdge: edge, storageMode: .shared
+                d, device: device, maxEdge: edge, storageMode: device.cpuVisibleTextureStorage
             ))
             lease.release()
         }

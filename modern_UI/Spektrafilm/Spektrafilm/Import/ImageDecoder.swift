@@ -454,6 +454,12 @@ enum ImageDecoder {
         context.render(flipped, to: tex, commandBuffer: cb,
                        bounds: CGRect(origin: .zero, size: target.size), colorSpace: space)
         try checkpoint()
+        // `Session.sample` reads this texture on every hover, so the hand-over
+        // happens once, here, rather than once per read.
+        if tex.storageMode == .managed, let blit = cb.makeBlitCommandEncoder() {
+            blit.synchronize(resource: tex)
+            blit.endEncoding()
+        }
         cb.commit()
         cb.waitUntilCompleted()
         return tex

@@ -101,6 +101,7 @@ final class ColourManagementTests: XCTestCase {
         }
 
         let out = try XCTUnwrap(renderer.applyOutputTransform(to: src, setup: transform))
+        out.texture.synchronizeForCPU()
         var read = [UInt16](repeating: 0, count: 4)
         out.texture.getBytes(&read, bytesPerRow: 8, from: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0)
         let got = read.prefix(3).map { Double($0) / 65535 }
@@ -185,6 +186,8 @@ final class ColourManagementTests: XCTestCase {
             .texture
         let controlled = try XCTUnwrap(renderer.applyOutputTransform(to: engineOut, setup: control))
             .texture
+        exported.synchronizeForCPU()
+        controlled.synchronizeForCPU()
         var a = [UInt16](repeating: 0, count: encoded.count * 4)
         var b = [UInt16](repeating: 0, count: encoded.count * 4)
         exported.getBytes(&a, bytesPerRow: encoded.count * 8,
@@ -227,6 +230,7 @@ final class ColourManagementTests: XCTestCase {
         }
 
         let out = try XCTUnwrap(renderer.applyOutputTransform(to: src, setup: transform))
+        out.texture.synchronizeForCPU()
         var read = [UInt16](repeating: 0, count: 4)
         out.texture.getBytes(&read, bytesPerRow: 8, from: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0)
 

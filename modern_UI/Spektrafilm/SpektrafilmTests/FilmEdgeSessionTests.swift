@@ -269,6 +269,7 @@ final class FilmEdgeSessionTests: XCTestCase {
                 let frame = session.renderer.viewport.imageFrame
                 let tex = try XCTUnwrap(session.renderer.renderOffscreen(size: CGSize(width: 900, height: 900),
                                                                          backingScale: 1))
+                tex.synchronizeForCPU()
                 var px = [UInt16](repeating: 0, count: 900 * 900 * 4)
                 tex.getBytes(&px, bytesPerRow: 900 * 8, from: MTLRegionMake2D(0, 0, 900, 900), mipmapLevel: 0)
                 images.append(px)

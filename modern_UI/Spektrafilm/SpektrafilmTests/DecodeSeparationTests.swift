@@ -49,7 +49,7 @@ final class DecodeSeparationTests: XCTestCase {
     private func samples(_ texture: MTLTexture, _ device: MTLDevice) throws -> [UInt16] {
         let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: texture.pixelFormat, width: texture.width,
                                                          height: texture.height, mipmapped: false)
-        d.storageMode = .shared
+        d.storageMode = device.cpuVisibleTextureStorage
         let copy = try XCTUnwrap(device.makeTexture(descriptor: d))
         let queue = try XCTUnwrap(device.makeCommandQueue())
         let cb = try XCTUnwrap(queue.makeCommandBuffer())
@@ -58,6 +58,7 @@ final class DecodeSeparationTests: XCTestCase {
         blit.endEncoding()
         cb.commit()
         cb.waitUntilCompleted()
+        copy.synchronizeForCPU()
         var out = [UInt16](repeating: 0, count: texture.width * texture.height * 4)
         out.withUnsafeMutableBytes {
             copy.getBytes($0.baseAddress!, bytesPerRow: texture.width * 8,

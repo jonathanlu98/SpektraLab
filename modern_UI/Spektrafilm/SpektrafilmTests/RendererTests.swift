@@ -25,6 +25,7 @@ final class RendererTests: XCTestCase {
     }
 
     func pixel(_ tex: MTLTexture, _ x: Int, _ y: Int) -> [Double] {
+        tex.synchronizeForCPU()
         var px = [UInt16](repeating: 0, count: 4)
         tex.getBytes(&px, bytesPerRow: 8, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
         return px.prefix(3).map { Double($0) / 65535 }

@@ -259,7 +259,7 @@ enum CineonLUT {
         d.pixelFormat = .rgba16Float
         d.width = n; d.height = n; d.depth = n
         d.usage = .shaderRead
-        d.storageMode = .shared
+        d.storageMode = device.cpuVisibleTextureStorage
         guard let t = device.makeTexture(descriptor: d) else { return nil }
         half.withUnsafeBytes {
             t.replace(region: MTLRegionMake3D(0, 0, 0, n, n, n), mipmapLevel: 0, slice: 0,
