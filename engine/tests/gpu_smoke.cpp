@@ -163,6 +163,31 @@ int main(int argc, char** argv) {
         check(first == 8, "frame arena survives three frames of eight buffers");
     }
 
+    // --- giving memory back, and counting what was given -------------------
+    //
+    // The count is what the pressure handler and `idle_trim.py` go on. Under
+    // AddressSanitizer this is also the witness that `trim_pool` takes a
+    // buffer's size before deleting it: read after, the value usually survives,
+    // so without the sanitizer the two orders look the same.
+    {
+        g->begin_frame();
+        std::string trim_error;
+        const size_t bytes = 2u << 20;
+        bool ok = g->flush(trim_error);
+        g->trim_pool(0);                                  // whatever the sections above left
+        {
+            gpu::BufferRef held = g->alloc(bytes, trim_error);
+            ok = ok && bool(held);
+            ok = ok && g->trim_pool(0) == 0;              // a live handle is never freed
+        }
+        ok = ok && g->flush(trim_error);
+        const size_t freed = g->trim_pool(0);
+        ok = ok && freed == bytes;
+        check(ok, "trim_pool frees what nothing holds, and counts it",
+              ok ? "" : trim_error + " freed " + std::to_string(freed));
+        g->end_frame();
+    }
+
     delete g;
     std::printf("\n%d failures\n", failures);
     return failures ? 1 : 0;

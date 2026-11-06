@@ -784,8 +784,8 @@ public:
             auto queued = std::find(pending_.begin(), pending_.end(), b);
             if (queued != pending_.end()) pending_.erase(queued);
             if (b->mtl) b->mtl->release();
-            delete b;
             freed += b->bytes;
+            delete b;
         }
         return freed;
     }
