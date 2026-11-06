@@ -48,7 +48,9 @@ namespace spk::gpu {
 
 // Opaque device memory. On Apple silicon this is shared storage, so
 // `contents()` is a pointer into the same pages the GPU reads -- no staging,
-// no copy.
+// no copy. On a discrete GPU a frame-sized `alloc` lives in the GPU's memory and
+// has no mapping at all: `contents()` is null, and `read` and `copy` are how the
+// host reaches it (`kDeviceLocalFloor`, in the Metal backend).
 struct Buffer;
 
 class Gpu;

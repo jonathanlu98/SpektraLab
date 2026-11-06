@@ -53,6 +53,8 @@ struct Buffer {
     // Persistent *and* backed by a file rather than by this process's ledger,
     // so `release` knows to keep `file_backed_bytes_` honest (RFC-020 §4.7).
     bool file_backed = false;
+    // In the GPU's own memory, where only a blit reaches it (see `kDeviceLocalFloor`).
+    bool device_local = false;
     // Queued in `pending_` and not yet reclaimed. A second `release` for the
     // same buffer would otherwise queue it twice, and the duplicate is what
     // turns a caller's mistake into a use-after-free: `trim_pool` frees the
@@ -86,11 +88,34 @@ constexpr double kIdleTrimSeconds = 60.0;
 // A small constant goes in as `setBytes`, which avoids an allocation and a
 // residency entry. 4 kB is Metal's documented limit for it.
 constexpr size_t kInlineLimit = 4096;
+// On a GPU with its own memory (`hasUnifiedMemory` false: every Intel Mac's
+// discrete card), a shared buffer is system memory across the bus, and a chain
+// of full-frame kernels is mostly that traffic. So an intermediate of frame
+// size lives in the GPU's memory instead.
+//
+//     RX 6800, 24 MP, interleaved      shared      device-local
+//       full render                    3141 ms     605 ms
+//       full reprint                    560 ms     258 ms
+//       live render / reprint        150 / 40 ms   47 / 16 ms
+//
+// Bit-identical: `parity_render.py`'s strip hashes do not move.
+//
+// Below the floor stays host-visible: the partials and grids a node reads back
+// are tiny, read every time, and a blit for each would cost more than it saves.
+// What the host fills (`upload*`) is shared whatever its size, and so is what a
+// session keeps (`alloc_persistent`, `alloc_file_backed`): those are read once
+// per render rather than once per node, and the file-backed ones are what keeps
+// them out of the process's footprint in the first place.
+//
+// `SPEKTRAFILM_SHARED_POOL=1` turns it off, for interleaved measurement (trap
+// 17). On unified memory there is nothing to choose and this never applies.
+constexpr size_t kDeviceLocalFloor = 1u << 20;
 
 class MetalGpu final : public Gpu {
 public:
     MetalGpu(MTL::Device* device, bool owns_device, MTL::Library* library, MTL::CommandQueue* queue)
-        : device_(device), owns_device_(owns_device), library_(library), queue_(queue) {}
+        : device_(device), owns_device_(owns_device), library_(library), queue_(queue),
+          device_local_pool_(!device->hasUnifiedMemory() && !std::getenv("SPEKTRAFILM_SHARED_POOL")) {}
 
     ~MetalGpu() override {
         // First, so no handler can be running (or start) while the pool below
@@ -336,13 +361,21 @@ public:
     }
 
     BufferRef alloc(size_t bytes, std::string& error) override {
+        return alloc_pooled(bytes, device_local_pool_ && bytes >= kDeviceLocalFloor, error);
+    }
+
+    // `device_local` is a property of the pool's hand-outs and not a preference:
+    // the two kinds never serve each other's requests, because a small request's
+    // caller is entitled to `contents()` and a large one's is entitled to the
+    // GPU's memory.
+    BufferRef alloc_pooled(size_t bytes, bool device_local, std::string& error) {
         if (bytes == 0) { error = "zero-length allocation"; return {}; }
         {
             // Reuse the smallest free buffer that fits, so a chain of
             // same-sized full-frame nodes recycles two or three buffers
             // rather than one per node.
             std::lock_guard<std::mutex> guard(pool_lock_);
-            if (Buffer* best = take_reusable_locked(bytes)) return BufferRef(this, best);
+            if (Buffer* best = take_reusable_locked(bytes, device_local)) return BufferRef(this, best);
         }
         // Nothing reusable fits. A long stretch with no flush in it can leave
         // most of the pool dead but not yet reclaimable: `release` puts a
@@ -386,7 +419,7 @@ public:
             bool worth = false;
             {
                 std::lock_guard<std::mutex> guard(pool_lock_);
-                worth = pending_would_serve_locked(bytes);
+                worth = pending_would_serve_locked(bytes, device_local);
             }
             if (worth) {
                 // A failed flush falls through to a fresh buffer rather than
@@ -395,16 +428,18 @@ public:
                 std::string ignored;
                 if (flush(ignored)) {
                     std::lock_guard<std::mutex> guard(pool_lock_);
-                    if (Buffer* best = take_reusable_locked(bytes)) return BufferRef(this, best);
+                    if (Buffer* best = take_reusable_locked(bytes, device_local)) return BufferRef(this, best);
                 }
             }
         }
-        MTL::Buffer* mtl = device_->newBuffer(bytes, MTL::ResourceStorageModeShared);
+        MTL::Buffer* mtl = device_->newBuffer(bytes, device_local ? MTL::ResourceStorageModePrivate
+                                                                  : MTL::ResourceStorageModeShared);
         if (!mtl) {
             error = "out of GPU memory allocating " + std::to_string(bytes) + " bytes";
             return {};
         }
         Buffer* b = new Buffer{mtl, bytes, 1, false, false};
+        b->device_local = device_local;
         std::lock_guard<std::mutex> guard(pool_lock_);
         pool_.push_back(b);
         add_live_locked(b->bytes);
@@ -414,18 +449,26 @@ public:
 
     BufferRef alloc_zeroed(size_t bytes, std::string& error) override {
         BufferRef b = alloc(bytes, error);
-        if (b) std::memset(b.get()->mtl->contents(), 0, bytes);
+        if (!b) return b;
+        if (!b.get()->device_local) {
+            std::memset(b.get()->mtl->contents(), 0, bytes);
+            return b;
+        }
+        MTL::BlitCommandEncoder* blit = blit_encoder(error);
+        if (!blit) return {};
+        blit->fillBuffer(b.get()->mtl, NS::Range(0, bytes), 0);
+        blit->endEncoding();
         return b;
     }
 
     BufferRef upload(const void* data, size_t bytes, std::string& error) override {
-        BufferRef b = alloc(bytes, error);
+        BufferRef b = alloc_pooled(bytes, false, error);
         if (b) std::memcpy(b.get()->mtl->contents(), data, bytes);
         return b;
     }
 
     BufferRef upload_f32(const double* data, size_t count, std::string& error) override {
-        BufferRef b = alloc(count * sizeof(float), error);
+        BufferRef b = alloc_pooled(count * sizeof(float), false, error);
         if (!b) return {};
         float* dst = static_cast<float*>(b.get()->mtl->contents());
         for (size_t i = 0; i < count; ++i) dst[i] = float(data[i]);
@@ -618,6 +661,46 @@ public:
 
     void* contents(Buffer* b) override { return b->mtl->contents(); }
     size_t size_bytes(Buffer* b) const override { return b->bytes; }
+
+    // A device-local buffer has no host mapping, so these two are a blit where
+    // the base class is a `memcpy`. Encoded into the open command buffer, which
+    // is what orders them after the kernels already in it, and flushed because
+    // the contract is that the transfer is complete on return.
+    bool copy(Buffer* dst, size_t dst_offset, Buffer* src, size_t src_offset,
+              size_t bytes, std::string& error) override {
+        if (!validate_copy(dst, dst_offset, src, src_offset, bytes, error)) return false;
+        if (bytes == 0 || (dst == src && dst_offset == src_offset)) return true;
+        if (!dst->device_local && !src->device_local) {
+            return Gpu::copy(dst, dst_offset, src, src_offset, bytes, error);
+        }
+        MTL::BlitCommandEncoder* blit = blit_encoder(error);
+        if (!blit) return false;
+        blit->copyFromBuffer(src->mtl, src_offset, dst->mtl, dst_offset, bytes);
+        blit->endEncoding();
+        return flush(error);
+    }
+
+    bool read(Buffer* src, size_t src_offset, void* host_dst, size_t bytes,
+              std::string& error) override {
+        if (!validate_read(src, src_offset, host_dst, bytes, error)) return false;
+        if (bytes == 0) return true;
+        if (!src->device_local) return Gpu::read(src, src_offset, host_dst, bytes, error);
+        MTL::Buffer* staging = device_->newBuffer(bytes, MTL::ResourceStorageModeShared);
+        if (!staging) {
+            error = "out of memory staging a read of " + std::to_string(bytes) + " bytes";
+            return false;
+        }
+        MTL::BlitCommandEncoder* blit = blit_encoder(error);
+        bool ok = blit != nullptr;
+        if (ok) {
+            blit->copyFromBuffer(src->mtl, src_offset, staging, 0, bytes);
+            blit->endEncoding();
+            ok = flush(error);
+        }
+        if (ok) std::memcpy(host_dst, staging->contents(), bytes);
+        staging->release();
+        return ok;
+    }
 
     bool dispatch(const char* kernel, const std::vector<Arg>& args,
                   size_t n_threads, std::string& error) override {
@@ -1052,10 +1135,10 @@ private:
 
     // Caller holds `pool_lock_`. The smallest free buffer that fits, taken
     // (its reference is handed to the caller).
-    Buffer* take_reusable_locked(size_t bytes) {
+    Buffer* take_reusable_locked(size_t bytes, bool device_local) {
         Buffer* best = nullptr;
         for (Buffer* b : pool_)
-            if (b->refs == 0 && b->reusable && b->bytes >= bytes &&
+            if (b->refs == 0 && b->reusable && b->bytes >= bytes && b->device_local == device_local &&
                 (!best || b->bytes < best->bytes)) best = b;
         if (best) {
             ++audit_.reuses;
@@ -1101,9 +1184,9 @@ private:
     // Caller holds `pool_lock_`. A buffer whose last handle has dropped but
     // which is not reusable yet, because the command buffer that names it has
     // not run. It would serve this request if it had.
-    bool pending_would_serve_locked(size_t bytes) {
+    bool pending_would_serve_locked(size_t bytes, bool device_local) {
         for (Buffer* b : pending_)
-            if (b->refs == 0 && b->bytes >= bytes) return true;
+            if (b->refs == 0 && b->bytes >= bytes && b->device_local == device_local) return true;
         return false;
     }
 
@@ -1145,13 +1228,28 @@ private:
         pending_.clear();
     }
 
+    // The open command buffer, opened if there is none.
+    bool ensure_command_buffer(std::string& error) {
+        if (command_buffer_) return true;
+        command_buffer_ = queue_->commandBuffer();
+        if (!command_buffer_) { error = "could not open a command buffer"; return false; }
+        command_buffer_->retain();
+        encoder_ = nullptr;
+        return true;
+    }
+
+    // A blit in sequence with the kernels: the compute encoder ends, and the
+    // next `dispatch` opens another. The caller ends this one.
+    MTL::BlitCommandEncoder* blit_encoder(std::string& error) {
+        if (!ensure_command_buffer(error)) return nullptr;
+        if (encoder_) { encoder_->endEncoding(); encoder_ = nullptr; }
+        MTL::BlitCommandEncoder* blit = command_buffer_->blitCommandEncoder();
+        if (!blit) error = "could not open a blit encoder";
+        return blit;
+    }
+
     MTL::ComputeCommandEncoder* encoder(std::string& error) {
-        if (!command_buffer_) {
-            command_buffer_ = queue_->commandBuffer();
-            if (!command_buffer_) { error = "could not open a command buffer"; return nullptr; }
-            command_buffer_->retain();
-            encoder_ = nullptr;
-        }
+        if (!ensure_command_buffer(error)) return nullptr;
         if (!encoder_) {
             encoder_ = command_buffer_->computeCommandEncoder();
             if (!encoder_) { error = "could not open a compute encoder"; return nullptr; }
@@ -1163,6 +1261,7 @@ private:
     bool owns_device_ = false;
     MTL::Library* library_ = nullptr;
     MTL::CommandQueue* queue_ = nullptr;
+    const bool device_local_pool_;
     MTL::CommandBuffer* command_buffer_ = nullptr;
     MTL::ComputeCommandEncoder* encoder_ = nullptr;
     std::unordered_map<std::string, MTL::ComputePipelineState*> pipelines_;

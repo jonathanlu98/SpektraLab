@@ -146,6 +146,64 @@ int main(int argc, char** argv) {
         g->end_frame();
     }
 
+    // --- a frame-sized buffer, which on a discrete GPU has no host mapping ---
+    //
+    // `kDeviceLocalFloor` puts it in the GPU's memory there, and `copy`, `read`
+    // and `alloc_zeroed` become blits. On unified memory this is the plain path
+    // and every line still has to hold, so it runs everywhere.
+    {
+        g->begin_frame();
+        const size_t n = (4u << 20) / sizeof(float);
+        const size_t bytes = n * sizeof(float);
+        std::vector<float> x(n);
+        for (size_t i = 0; i < n; ++i) x[i] = 0.25f + float(i % 65521) * 0.25f;
+        gpu::BufferRef host = g->upload(x.data(), bytes, error);
+        gpu::BufferRef frame = g->alloc(bytes, error);
+        std::vector<float> back(n, -1.0f);
+        bool ok = bool(host) && bool(frame) &&
+                  g->copy(frame.get(), 0, host.get(), 0, bytes, error) &&
+                  g->read(frame.get(), 0, back.data(), bytes, error) &&
+                  std::memcmp(back.data(), x.data(), bytes) == 0;
+        check(ok, "a frame-sized buffer: copied in and read back", ok ? "" : error);
+
+        // At an offset, which is the shape the strip executor's copies take.
+        const size_t skip = 1000;
+        gpu::BufferRef part = g->alloc(bytes, error);
+        std::vector<float> tail(n - skip, -1.0f);
+        ok = bool(part) &&
+             g->copy(part.get(), skip * sizeof(float), frame.get(), skip * sizeof(float),
+                     bytes - skip * sizeof(float), error) &&
+             g->read(part.get(), skip * sizeof(float), tail.data(), tail.size() * sizeof(float), error) &&
+             std::memcmp(tail.data(), x.data() + skip, tail.size() * sizeof(float)) == 0;
+        check(ok, "and at an offset", ok ? "" : error);
+
+        // A kernel writes it: the result has to reach the host through `read`.
+        const float k[3] = {1.0f, 2.0f, 0.5f};
+        const uint32_t meta[1] = {uint32_t(n)};
+        gpu::BufferRef bk = g->upload(k, sizeof k, error);
+        ok = bool(bk) && g->dispatch("spk_log10_guarded",
+                                     {gpu::Arg::buf(host), gpu::Arg::buf(bk), gpu::Arg::inline_bytes(meta, 1),
+                                      gpu::Arg::buf(frame)}, n, error) &&
+             g->read(frame.get(), 0, back.data(), bytes, error);
+        for (size_t i = 0; i < n && ok; i += 4099) {
+            const float want = std::log10(std::fmax(x[i] * k[i % 3], 0.0f) + 1e-10f);
+            ok = nearly(back[i], want, 1e-5f);
+            if (!ok) error = "index " + std::to_string(i);
+        }
+        check(ok, "a kernel's frame-sized output reaches the host", ok ? "" : error);
+
+        // Zeroed has to mean zeroed on a *reused* buffer: `frame` is dirty, and
+        // once it is idle the pool hands it straight back.
+        frame.reset();
+        part.reset();
+        ok = g->flush(error);
+        gpu::BufferRef zero = ok ? g->alloc_zeroed(bytes, error) : gpu::BufferRef();
+        ok = bool(zero) && g->read(zero.get(), 0, back.data(), bytes, error);
+        for (size_t i = 0; i < n && ok; ++i) ok = back[i] == 0.0f;
+        check(ok, "alloc_zeroed zeroes a reused frame-sized buffer", ok ? "" : error);
+        g->end_frame();
+    }
+
     // --- the arena, which must reuse rather than grow ----------------------
     {
         size_t first = 0;
