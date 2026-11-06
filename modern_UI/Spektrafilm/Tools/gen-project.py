@@ -73,6 +73,10 @@ PRODUCT_NAME = "SpektraLab"
 TESTS = "SpektrafilmTests"
 BUNDLE_ID = "com.hanze.filmify"
 MACOS = "15.0"
+# The Intel build. One place, read by `Tools/package.sh` for the DMG's name and
+# the slice check on the artefact, so neither can disagree with the bundle. The
+# sources take either architecture: `"arm64 x86_64"` is a universal app.
+ARCHS = "x86_64"
 
 # The version, in one place.
 #
@@ -270,7 +274,7 @@ def build() -> str:
         "SWIFT_STRICT_CONCURRENCY": "complete",
         "MACOSX_DEPLOYMENT_TARGET": MACOS,
         "SDKROOT": "macosx",
-        "ARCHS": "arm64",
+        "ARCHS": f'"{ARCHS}"' if " " in ARCHS else ARCHS,
         "ONLY_ACTIVE_ARCH": "YES",
         "CODE_SIGN_STYLE": "Manual" if TEAM_ID else "Automatic",
         "CODE_SIGN_IDENTITY": f'"{SIGN_IDENTITY}"',

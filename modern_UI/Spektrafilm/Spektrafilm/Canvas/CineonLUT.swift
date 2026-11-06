@@ -35,6 +35,9 @@
 
 import Foundation
 import Metal
+#if arch(x86_64)
+import Accelerate
+#endif
 import simd
 
 enum CineonLUT {
@@ -253,7 +256,11 @@ enum CineonLUT {
     static func makeTexture(device: MTLDevice) -> MTLTexture? {
         guard let url = bundled(.proPhoto), let text = try? String(contentsOf: url, encoding: .utf8),
               let (n, rgba) = parse(text) else { return nil }
+        #if arch(x86_64)
+        let half = halfFloatBits(rgba)
+        #else
         let half = rgba.map { Float16($0) }
+        #endif
         let d = MTLTextureDescriptor()
         d.textureType = .type3D
         d.pixelFormat = .rgba16Float
@@ -267,4 +274,25 @@ enum CineonLUT {
         }
         return t
     }
+
+    #if arch(x86_64)
+    /// `Float16` is compiled out of the Intel macOS standard library, so the
+    /// conversion goes through vImage: the same IEEE 754 binary16, rounded to
+    /// nearest even, in the bytes the texture wants.
+    static func halfFloatBits(_ values: [Float]) -> [UInt16] {
+        var out = [UInt16](repeating: 0, count: values.count)
+        values.withUnsafeBufferPointer { src in
+            out.withUnsafeMutableBufferPointer { dst in
+                var from = vImage_Buffer(data: UnsafeMutableRawPointer(mutating: src.baseAddress!),
+                                         height: 1, width: vImagePixelCount(src.count),
+                                         rowBytes: src.count * MemoryLayout<Float>.size)
+                var to = vImage_Buffer(data: UnsafeMutableRawPointer(dst.baseAddress!),
+                                       height: 1, width: vImagePixelCount(dst.count),
+                                       rowBytes: dst.count * MemoryLayout<UInt16>.size)
+                vImageConvert_PlanarFtoPlanar16F(&from, &to, vImage_Flags(kvImageNoFlags))
+            }
+        }
+        return out
+    }
+    #endif
 }

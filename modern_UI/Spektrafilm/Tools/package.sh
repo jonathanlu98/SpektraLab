@@ -30,9 +30,9 @@
 #       --apple-id you@example.com --team-id TEAMID --password <app-specific>
 #   export SPEKTRAFILM_NOTARY_PROFILE=SPEKTRAFILM_NOTARY
 #
-# ARM ONLY. `ARCHS = arm64`, which is fine for an Apple-silicon release and
-# must be *stated* rather than discovered: the DMG's name carries it and so
-# should the release notes (HANDOFF-DISTRIBUTION §2.5).
+# The architectures are `ARCHS` in gen-project.py, and they must be *stated*
+# rather than discovered: the DMG's name carries them and so should the release
+# notes (HANDOFF-DISTRIBUTION §2.5).
 set -euo pipefail
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -55,7 +55,12 @@ if [[ -z "$version" ]]; then
   echo "error: could not read MARKETING_VERSION from $here/gen-project.py" >&2
   exit 1
 fi
-dmg="$out/SpektraLab-$version-arm64.dmg"
+archs_wanted=$(sed -n 's/^ARCHS = "\(.*\)"$/\1/p' "$here/gen-project.py")
+if [[ -z "$archs_wanted" ]]; then
+  echo "error: could not read ARCHS from $here/gen-project.py" >&2
+  exit 1
+fi
+dmg="$out/SpektraLab-$version-${archs_wanted// /+}.dmg"
 
 say() { printf '\n=== %s\n' "$*"; }
 run() { if $dry; then printf '  would run: %s\n' "$*"; else "$@"; fi; }
@@ -69,7 +74,7 @@ else
   echo "  ad-hoc (\$SPEKTRAFILM_SIGN_IDENTITY is unset)"
   echo "  the result will run here and be REFUSED on every other Mac."
 fi
-echo "  version:      $version (arm64 only)"
+echo "  version:      $version ($archs_wanted)"
 
 # --- 0. the resources the bundle must carry --------------------------------
 # Before anything is compiled: a release built without these is a release that
@@ -136,9 +141,9 @@ if ! $dry; then
 fi
 
 # --- 4b. the floor every Mac has to meet -----------------------------------
-# "Every Apple-silicon Mac on macOS 15 or later" is checked on the artefact,
-# not believed from the build settings: every Mach-O must be arm64 with a
-# minos of at most 15, and every metallib must be stamped for macOS 15. The
+# "Every Mac of this architecture on macOS 15 or later" is checked on the
+# artefact, not believed from the build settings: every Mach-O must carry every
+# slice in `ARCHS` with a minos of at most 15, and every metallib must be stamped for macOS 15. The
 # engine's metallib is built outside Xcode, and it once shipped stamped for
 # the build machine's macOS 27 -- it would open and fail to render on anything older.
 say "deployment floor"
@@ -153,7 +158,9 @@ if ! $dry; then
     archs=$(lipo -archs "$f")
     minos=$(vtool -show-build "$f" 2>/dev/null | awk '/minos/ {print $2; exit}')
     echo "  ${f#"$app/"}: $archs, minos $minos"
-    [[ "$archs" == *arm64* ]] || { echo "error: $f has no arm64 slice" >&2; bad=1; }
+    for want in $archs_wanted; do
+      [[ " $archs " == *" $want "* ]] || { echo "error: $f has no $want slice" >&2; bad=1; }
+    done
     [[ "${minos%%.*}" -le "$floor" ]] || { echo "error: $f needs macOS $minos" >&2; bad=1; }
   done < <(find "$app" -type f -print0)
   while IFS= read -r -d '' f; do

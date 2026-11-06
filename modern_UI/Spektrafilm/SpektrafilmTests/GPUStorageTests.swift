@@ -73,4 +73,23 @@ final class GPUStorageTests: XCTestCase {
         XCTAssertEqual(read[0], 1234)
     }
 
+    #if arch(x86_64)
+    /// Hand-derived IEEE 754 binary16, because the point of this function is
+    /// that `Float16` is not there to compare it with on this architecture.
+    func testHalfFloatBitsAreIEEEBinary16() {
+        let cases: [(Float, UInt16)] = [
+            (0, 0x0000), (1, 0x3C00), (0.5, 0x3800), (-2, 0xC000), (1.0 / 3.0, 0x3555),
+            (65504, 0x7BFF),                     // the largest finite value
+            (1e6, 0x7C00),                       // overflows to infinity
+            (6.103515625e-05, 0x0400),           // the smallest normal, 2^-14
+            (5.960464477539063e-08, 0x0001),     // the smallest subnormal, 2^-24
+            (1 + 0x1p-11, 0x3C00),               // a tie, to even
+            (1 + 3 * 0x1p-11, 0x3C02),           // a tie, to even, upward
+        ]
+        let got = CineonLUT.halfFloatBits(cases.map(\.0))
+        for (i, c) in cases.enumerated() {
+            XCTAssertEqual(got[i], c.1, "\(c.0)")
+        }
+    }
+    #endif
 }

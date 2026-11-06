@@ -492,7 +492,7 @@ final class Diagnostics {
 
     private nonisolated static func highestFamily(_ device: MTLDevice) -> String {
         let families: [(String, MTLGPUFamily)] = [
-            ("apple9", .apple9), ("apple8", .apple8), ("apple7", .apple7), ("metal3", .metal3),
+            ("apple9", .apple9), ("apple8", .apple8), ("apple7", .apple7), ("mac2", .mac2), ("metal3", .metal3),
         ]
         return families.first { device.supportsFamily($0.1) }?.0 ?? "unknown"
     }
